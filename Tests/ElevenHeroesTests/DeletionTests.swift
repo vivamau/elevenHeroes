@@ -31,7 +31,7 @@ struct DeletionTests {
         for record in try db.records(.stadium) { try db.delete(.stadium, id: record.id) }
         for record in try db.records(.city) { try db.delete(.city, id: record.id) }
         for record in try db.records(.country) { try db.delete(.country, id: record.id) }
-        for kind in RecordKind.allCases { #expect(try db.records(kind).isEmpty) }
+        for kind in RecordKind.allCases where kind != .tactic { #expect(try db.records(kind).isEmpty) }
         // A fresh batch must still work after removing all records and their dependencies.
         _ = try db.generate(.team, count: 2)
         #expect(try Database.load(url).allSatisfy { $0.players.count == 22 })

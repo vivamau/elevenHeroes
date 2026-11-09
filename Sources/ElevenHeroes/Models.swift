@@ -10,6 +10,7 @@ struct Footballer: Identifiable, Codable, Hashable {
     var profile: PlayerProfile? = nil
     var marketValue: Int? = nil
     var valueHistory: [PlayerValueRecord]? = nil
+    var contractEndDate: Int? = nil
     var salary: Int? = nil
     static let minimumSalary = 10
     var currentSalary: Int { max(Self.minimumSalary, salary ?? valueHistory?.last?.salary ?? Self.minimumSalary) }
@@ -60,6 +61,11 @@ struct Standing: Identifiable {
     var awayDifference: Int { awayScored - awayConceded }
 }
 struct Season: Codable {
+    /// Schema version for the serialized career. `nil` means a pre-versioning save.
+    var schemaVersion: Int? = nil
+    /// Optional override for match simulation parameters. `nil` uses defaults.
+    var matchParameters: MatchSimulationParameters? = nil
+    static let currentSchemaVersion = 1
     var clubs: [Club]
     var fixtures: [Fixture]
     var selectedClub: Int
@@ -85,6 +91,7 @@ struct Season: Codable {
     var completedSeasons: [CompletedSeason]? = nil
     var credits: Int { creditBalance ?? 10_000 }
     var finished: Bool { fixtures.allSatisfy { $0.homeGoals != nil } }
+
     var standings: [Standing] {
         clubs.map { club in
             var row = Standing(club: club)
@@ -130,22 +137,11 @@ struct Season: Codable {
         for index in fixtures.indices where fixtures[index].round == round && fixtures[index].homeGoals == nil {
             let f = fixtures[index]
             guard let home = clubs.first(where: { $0.id == f.home }), let away = clubs.first(where: { $0.id == f.away }) else { continue }
-            func power(_ club: Club) -> Double {
-                if club.id == selectedClub {
-                    let chosen = club.players.filter { lineup.contains($0.id) }
-                    return Double(chosen.map(\.rating).reduce(0,+)) / 11
-                }
-                return club.strength
-            }
-            let delta = (power(home) - power(away)) / 45
+
             let involved = home.id == selectedClub || away.id == selectedClub
-            let volatility = involved ? (tactic == "Attacking" ? 0.35 : tactic == "Defensive" ? -0.25 : 0) : 0
-            func goals(_ expected: Double, _ rng: inout R) -> Int {
-                let limit = exp(-max(0.15, expected)); var product = 1.0, count = 0
-                repeat { count += 1; product *= Double.random(in: 0.000001...1, using: &rng) } while product > limit && count < 12
-                return count - 1
-            }
-            let hg = goals(1.5 + delta + volatility, &rng), ag = goals(1.15 - delta + volatility, &rng)
+            let context = MatchSimulationContext(home: home, away: away, selectedClub: selectedClub, lineup: lineup, tactic: tactic, round: round, fixtures: fixtures, year: year)
+            let simulator = MatchSimulator(parameters: matchParameters ?? .default)
+            let (hg, ag) = simulator.simulate(context: context, rng: &rng)
             fixtures[index].homeGoals = hg; fixtures[index].awayGoals = ag
             let capacity = max(0, home.stadiumCapacity ?? 20_000)
             fixtures[index].stadiumCapacity = capacity
@@ -153,7 +149,7 @@ struct Season: Codable {
             fixtures[index].attendance = Int((Double(capacity) * Double.random(in: 0.55...1.0, using: &rng)).rounded())
             let revenue = (fixtures[index].attendance ?? 0) * (home.id == selectedClub ? homeTicketPrice : 10)
             fixtures[index].ticketRevenue = revenue
-            if home.id == selectedClub { creditBalance = credits + revenue }
+            // Credits are settled once per involved match, after both revenue and wages are known.
             var events: [(Int, String)] = []
             var recorded: [GoalEvent] = []
             for (club, count) in [(home,hg),(away,ag)] {
@@ -207,7 +203,8 @@ struct Season: Codable {
             fixtures[index].awayWages = away.weeklyWages
             if involved {
                 let wages = home.id == selectedClub ? home.weeklyWages : away.weeklyWages
-                creditBalance = credits - wages
+                let income = home.id == selectedClub ? revenue : 0
+                creditBalance = credits + income - wages
                 commentary = ["Kick-off · \(home.name) v \(away.name)"] + events.sorted { $0.0 < $1.0 }.map(\.1) + ["Full time · \(home.name) \(hg) – \(ag) \(away.name)", "Weekly wages · \(wages.formatted()) credits paid for the full squad"]
             }
         }
@@ -235,10 +232,14 @@ enum Database {
             if let db { sqlite3_close(db) }; throw NSError(domain: "Database", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot open the football database."])
         }
         defer { sqlite3_close(db) }
-        func rows(_ sql: String) throws -> [[String]] {
+        func rows(_ sql: String, _ params: [String] = []) throws -> [[String]] {
             var statement: OpaquePointer?
             guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { throw NSError(domain: "Database", code: 2, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(db))]) }
             defer { sqlite3_finalize(statement) }
+            for (index, value) in params.enumerated() {
+                let bindResult = value.withCString { sqlite3_bind_text(statement, Int32(index + 1), $0, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self)) }
+                guard bindResult == SQLITE_OK else { throw NSError(domain: "Database", code: 3, userInfo: [NSLocalizedDescriptionKey: String(cString: sqlite3_errmsg(db))]) }
+            }
             var result: [[String]] = []
             while sqlite3_step(statement) == SQLITE_ROW {
                 result.append((0..<sqlite3_column_count(statement)).map { i in sqlite3_column_text(statement,i).map { String(cString: $0) } ?? "" })
@@ -250,15 +251,20 @@ enum Database {
         let histories = try FootballDatabase(url: url).playerValueHistories()
         let hasStadiumLinks = !(try rows("SELECT name FROM sqlite_master WHERE type='table' AND name='stadium_team'")).isEmpty
         let stadiumRows = hasStadiumLinks ? try rows("SELECT st.team_id,s.stadium_name,s.stadium_seats + COALESCE((SELECT SUM(si.stadium_impr_add_seats) FROM stadium_improvement si WHERE si.stadium_id=s.id),0) FROM stadium_team st JOIN stadium s ON s.id=st.stadium_id ORDER BY st.id") : []
+        let contractRows = try? rows("SELECT player_id, player_contract_end_date FROM player_contract")
+        let contractEnds = Dictionary((contractRows ?? []).compactMap { row -> (Int, Int)? in
+            guard row.count >= 2, let pid = Int(row[0]), let end = Int(row[1]) else { return nil }
+            return (pid, end)
+        }, uniquingKeysWith: { max($0, $1) })
         let teams = try rows("SELECT t.id,t.team_name,COALESCE(c.city_name,'') FROM team t LEFT JOIN city c ON c.id=t.city_id ORDER BY t.id")
         return try teams.map { t in
             let id = Int(t[0]) ?? 0
-            let players = try rows("SELECT DISTINCT p.id,p.player_name || ' ' || p.player_lastname,COALESCE((s.player_skills_phys_pace+s.player_skills_phys_stamina+s.player_skills_phys_strength)/3.0,10) FROM player p JOIN team_players tp ON tp.player_id=p.id LEFT JOIN player_skills_physical s ON s.player_id=p.id WHERE tp.team_id=\(id) ORDER BY p.id")
+            let players = try rows("SELECT DISTINCT p.id,p.player_name || ' ' || p.player_lastname,COALESCE((s.player_skills_phys_pace+s.player_skills_phys_stamina+s.player_skills_phys_strength)/3.0,10) FROM player p JOIN team_players tp ON tp.player_id=p.id LEFT JOIN player_skills_physical s ON s.player_id=p.id WHERE tp.team_id=? ORDER BY p.id", [String(id)])
             let stadium = stadiumRows.last { $0[0] == String(id) }
             return Club(id: id, name: t[1], city: t[2], players: players.enumerated().map { i,p in
                 Footballer(id: Int(p[0]) ?? i, name: p[1], role: profiles[Int(p[0]) ?? 0]?.values["position_name"].map { position in
                     if position == "GK" { return "GK" }; if position.hasPrefix("D") { return "DEF" }; if position.hasPrefix("M") { return "MID" }; if position.hasPrefix("A") { return "FWD" }; return position
-                } ?? role(i), rating: min(99,max(1,Int((Double(p[2]) ?? 10) * 5))), profile: profiles[Int(p[0]) ?? 0], marketValue: values[Int(p[0]) ?? 0], valueHistory: histories[Int(p[0]) ?? 0])
+                } ?? role(i), rating: min(99,max(1,Int((Double(p[2]) ?? 10) * 5))), profile: profiles[Int(p[0]) ?? 0], marketValue: values[Int(p[0]) ?? 0], valueHistory: histories[Int(p[0]) ?? 0], contractEndDate: contractEnds[Int(p[0]) ?? 0])
             }, stadiumName: stadium?[1], stadiumCapacity: stadium.flatMap { Int($0[2]) }.map { max(0, $0) })
         }
     }
@@ -278,5 +284,15 @@ enum Database {
         let first = ["Luca", "Alex", "Noah", "Leo", "Daniel", "Oliver", "Mateo", "James", "Adam", "Oscar", "Ethan", "Gabriel", "Theo", "Rafael", "Samuel", "Felix", "Marco", "Hugo", "Isaac", "Nico"]
         let last = ["Silva", "Morgan", "Rossi", "Clarke", "Costa", "Bennett", "Martin", "Santos", "Reed", "Walsh", "Meyer", "Evans", "Cole", "Rivera", "Brooks", "Moretti", "Hayes", "Dubois", "Stone", "Alves"]
         return names.enumerated().map { c,name in Club(id: c+1, name: name, city: name.components(separatedBy: " ")[0], players: (0..<20).map { p in Footballer(id: c*100+p+1, name: "\(first[p]) \(last[(p+c*3)%20])", role: role(p), rating: 55 + (p*7+c*11)%35) }) }
+    }
+}
+
+
+extension Season {
+    /// Brings older saves up to the current schema version without changing their data.
+    mutating func migrateSchema() {
+        if schemaVersion == nil || schemaVersion! < Self.currentSchemaVersion {
+            schemaVersion = Self.currentSchemaVersion
+        }
     }
 }

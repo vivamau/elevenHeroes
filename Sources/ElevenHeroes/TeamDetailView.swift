@@ -52,7 +52,8 @@ struct TeamDetailView: View {
             if club.players.isEmpty {
                 ContentUnavailableView("No players assigned", systemImage: "person.3", description: Text("Assign players to this team in the database manager."))
             } else {
-                SquadTableView(players: club.players) { selectedPlayer = $0 }
+                let expiring = Set(club.players.filter { ($0.contractEndDate ?? Int.max) <= (career?.year ?? 2026) + 1 }.map(\.id))
+                SquadTableView(players: club.players, expiringContractIDs: expiring) { selectedPlayer = $0 }
                 Text("Overall ratings use physical attributes. Players without recorded positions use provisional roles.")
                     .font(.caption).foregroundStyle(.secondary)
             }

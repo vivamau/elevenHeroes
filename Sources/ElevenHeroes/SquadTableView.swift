@@ -5,6 +5,7 @@ struct SquadTableView: View {
     var lineup: [Int] = []
     var substitutes: [Int] = []
     var onToggle: ((Int) -> Void)? = nil
+    var expiringContractIDs: Set<Int> = []
     let onPlayer: (Footballer) -> Void
     @State private var search = ""
     @State private var sortKey = "name"
@@ -82,7 +83,7 @@ struct SquadTableView: View {
                                 ForEach(columns) { column in
                                     Group {
                                         if column.id == "name" {
-                                            Button(player.name) { onPlayer(player) }.buttonStyle(.plain).foregroundStyle(AppTheme.accent).fontWeight(.medium)
+                                            Button(player.name) { onPlayer(player) }.buttonStyle(.plain).foregroundStyle(expiringContractIDs.contains(player.id) ? .orange : AppTheme.accent).fontWeight(.medium)
                                         } else { Text(value(player, column.id)).monospacedDigit() }
                                     }.lineLimit(1).help(value(player, column.id))
                                         .frame(width: column.width - 24, alignment: column.numeric ? .trailing : .leading)

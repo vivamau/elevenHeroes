@@ -29,7 +29,9 @@ struct PlayerDetailView: View {
     var teamName: String
     var backLabel = "Back"
     var onTeam: (() -> Void)? = nil
+    var onOfferRenewal: ((Int, Int) -> Void)? = nil
     let onBack: () -> Void
+    @State private var showingRenewal = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -106,15 +108,38 @@ struct PlayerDetailView: View {
                     Image(systemName: "creditcard")
                 }.font(.callout.weight(.medium)).foregroundStyle(AppTheme.accent)
                     .accessibilityLabel("Weekly wage: \(player.currentSalary) credits")
+                if let end = player.contractEndDate {
+                    let currentYear = career?.year ?? Calendar.current.component(.year, from: Date())
+                    let expiring = end <= currentYear + 1
+                    Label("Contract until \(end.formatted(.number.grouping(.never)))", systemImage: "calendar")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(expiring ? .orange : .secondary)
+                        .accessibilityLabel("Contract until \(end)")
+                }
             }
             Spacer(minLength: 10)
-            if player.rating > 0 {
-                VStack(spacing: 2) {
-                    Text("\(player.rating)").font(.system(size: 28, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(AppTheme.accent)
-                    Text("OVERALL").font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
-                }.accessibilityElement(children: .combine)
+            VStack(spacing: 8) {
+                if player.rating > 0 {
+                    VStack(spacing: 2) {
+                        Text("\(player.rating)").font(.system(size: 28, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(AppTheme.accent)
+                        Text("OVERALL").font(.system(size: 9, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
+                    }.accessibilityElement(children: .combine)
+                }
+                if onOfferRenewal != nil {
+                    Button("Offer renewal") { showingRenewal = true }
+                        .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                }
             }
         }
+        .sheet(isPresented: $showingRenewal) {
+            if let onOfferRenewal {
+                ContractRenewalSheet(player: player, career: career, onCancel: { showingRenewal = false }) { wage, years in
+                    onOfferRenewal(wage, years)
+                    showingRenewal = false
+                }
+            }
+        }
+    }
     }
     private func personal(_ profile: PlayerProfile) -> some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -136,6 +161,47 @@ struct PlayerDetailView: View {
             Text(value).font(.callout.weight(.medium)).lineLimit(2).help(value)
         }.accessibilityElement(children: .combine)
     }
+    private struct ContractRenewalSheet: View {
+        let player: Footballer
+        let career: Season?
+        let onCancel: () -> Void
+        let onSubmit: (Int, Int) -> Void
+        @State private var wage: Int
+        @State private var years: Int = 2
+        init(player: Footballer, career: Season?, onCancel: @escaping () -> Void, onSubmit: @escaping (Int, Int) -> Void) {
+            self.player = player
+            self.career = career
+            self.onCancel = onCancel
+            self.onSubmit = onSubmit
+            _wage = State(initialValue: player.currentSalary)
+        }
+        var body: some View {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Offer contract renewal").font(.title2.weight(.semibold))
+                Text("\(player.name)").foregroundStyle(.secondary)
+                HStack {
+                    Text("Weekly wage").fontWeight(.medium)
+                    Spacer()
+                    TextField("Credits", value: $wage, format: .number.grouping(.never))
+                        .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 110)
+                    Text("credits").foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Contract length").fontWeight(.medium)
+                    Spacer()
+                    Stepper("\(years) years", value: $years, in: 1...5)
+                }
+                HStack {
+                    Button("Cancel", role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("Submit renewal") { onSubmit(wage, years) }
+                        .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                        .disabled(wage < Footballer.minimumSalary)
+                }
+            }.padding(24).frame(width: 420).background(AppTheme.background)
+        }
+    }
+
     private func birthDate(_ profile: PlayerProfile) -> String {
         guard let raw = profile.values["player_dob"], let date = RecordDraft.dateFormatter.date(from: raw) else { return "Not recorded" }
         return date.formatted(date: .abbreviated, time: .omitted)
@@ -158,5 +224,4 @@ struct PlayerDetailView: View {
             }
         }.padding(16).frame(maxWidth: .infinity, minHeight: 210, alignment: .topLeading)
             .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: AppTheme.panelRadius))
-    }
 }

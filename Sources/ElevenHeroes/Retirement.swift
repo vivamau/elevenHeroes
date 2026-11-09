@@ -56,11 +56,13 @@ extension Season {
             let price = (purchase.player.creditsValue * 120 + 99) / 100
             marketPlayers?.removeAll { $0.id == purchase.id }
             var player = purchase.player
+            // A replacement starts a fresh valuation history, independent of the seller's seed or career history.
+            player.valueHistory = nil
             if let income = economyStadiumIncome {
-            var rng = SystemRandomNumberGenerator()
-            player.initializeEconomy(stadiumIncome: income, using: &rng)
-        }
-        player.recordValue(teamID: clubID, teamName: clubs[buyer].name, event: "Retirement replacement · \(price) credits", matchweek: 1, seasonYear: year)
+                var rng = SystemRandomNumberGenerator()
+                player.initializeEconomy(stadiumIncome: income, using: &rng)
+            }
+            player.recordValue(teamID: clubID, teamName: clubs[buyer].name, event: "Retirement replacement · \(price) credits", matchweek: 1, seasonYear: year)
             clubs[buyer].players.append(player)
             if replacementTransfers == nil { replacementTransfers = [] }
             replacementTransfers?.append(ReplacementTransfer(playerID: player.id, playerName: player.name, buyerID: clubID,

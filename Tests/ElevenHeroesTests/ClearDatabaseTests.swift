@@ -14,7 +14,7 @@ struct ClearDatabaseTests {
         _ = try db.generate(.team, count: 2)
         let before = try db.attributeChoices().mapValues { $0.map(\.name) }
         try db.clearWorld()
-        for kind in RecordKind.allCases { #expect(try db.records(kind).isEmpty) }
+        for kind in RecordKind.allCases where kind != .tactic { #expect(try db.records(kind).isEmpty) }
         #expect(try db.attributeChoices().mapValues { $0.map(\.name) } == before)
         #expect(store.prepareDatabase())
         #expect(try db.records(.country).isEmpty)

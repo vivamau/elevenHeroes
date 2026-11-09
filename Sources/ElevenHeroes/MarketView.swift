@@ -11,7 +11,7 @@ struct MarketView: View {
     @State private var viewedTeam: Club?
     @State private var tab = MarketTab.buy
     private var yourTeam: Bool { tab == .team }
-    private enum MarketTab { case buy, team, offers }
+    private enum MarketTab { case buy, team, offers, withoutContract }
     @State private var sort = MarketSort.name
 
     private enum MarketSort: String, CaseIterable {
@@ -61,6 +61,13 @@ struct MarketView: View {
                 marketTabs
                 if tab == .offers {
                     IncomingOffersView(store: store, onPlayer: { viewed = $0 }, onComplete: { message = $0 })
+                } else if tab == .withoutContract {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Players whose contracts have ended will appear here.", systemImage: "doc.text")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Text("No out-of-contract players are currently available.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.padding(20).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
                 } else { browser(listings) }
             }
         }
@@ -99,7 +106,8 @@ struct MarketView: View {
                 Text("Buy players").tag(MarketTab.buy)
                 Text("Your team").tag(MarketTab.team)
                 Text("Offers (\(store.season?.pendingOffers.count ?? 0))").tag(MarketTab.offers)
-            }.pickerStyle(.segmented).labelsHidden().frame(width: 380).controlSize(.large)
+                Text("Without contract").tag(MarketTab.withoutContract)
+            }.pickerStyle(.segmented).labelsHidden().frame(width: 470).controlSize(.large)
                 .onChange(of: tab) { _, _ in search = ""; message = nil }
             Spacer()
             Text(tab == .offers ? "Incoming bids" : "\(listings.count.formatted()) players")

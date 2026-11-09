@@ -39,7 +39,7 @@ extension Season {
         }
     }
 
-    mutating func startNextSeason(ticketPrice newPrice: Int? = nil) throws {
+    mutating func startNextSeason(ticketPrice newPrice: Int? = nil, matchParameters newParameters: MatchSimulationParameters? = nil) throws {
         let price = newPrice ?? homeTicketPrice
         guard (1...100).contains(price) else { throw DatabaseIssue(message: "Ticket price must be between 1 and 100 credits.") }
         guard finished, !fixtures.isEmpty, clubs.count > 1 else {
@@ -51,6 +51,7 @@ extension Season {
                                         clubs: clubs.map { Club(id: $0.id, name: $0.name, city: $0.city, players: []) }, ticketPrice: ticketPrice)
         completedSeasons?.append(completed)
         ticketPrice = price
+        if let newParameters { matchParameters = newParameters }
         seasonYear = year + 1
         for c in clubs.indices {
             for p in clubs[c].players.indices {

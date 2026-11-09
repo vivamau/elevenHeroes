@@ -52,6 +52,17 @@ extension ContentView {
                                 .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
                         }
                     }
+                    let expiring = (s.clubs.first { $0.id == s.selectedClub }?.players ?? []).filter { ($0.contractEndDate ?? Int.max) <= s.year + 1 }
+                    if !expiring.isEmpty {
+                        card("Contract renewals") {
+                            Text("\(expiring.count) player(s) have contracts expiring within 12 months.").foregroundStyle(.secondary)
+                            ForEach(expiring) { player in
+                                PlayerNameLink(id: player.id, name: player.name, career: s, player: player, teamName: "Contract until \(player.contractEndDate ?? s.year)")
+                                    .foregroundStyle(.orange)
+                            }
+                            Button("Review in Squad") { store.screen = "Squad" }.buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                        }
+                    }
                     card("Manager's notebook") {
                         Text("Build your starting XI, choose your approach, and play through a home-and-away league season.").foregroundStyle(.secondary)
                         Label("\(s.lineup.count) / 11 starters selected", systemImage: "person.crop.rectangle.stack").foregroundStyle(s.lineup.count == 11 ? AppTheme.accent : .orange)

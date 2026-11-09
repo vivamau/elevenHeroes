@@ -7,7 +7,7 @@ struct DatabaseIssue: LocalizedError {
 }
 
 enum RecordKind: String, CaseIterable, Identifiable {
-    case country, city, championship, team, stadium, player
+    case country, city, championship, team, stadium, player, tactic
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -17,9 +17,10 @@ enum RecordKind: String, CaseIterable, Identifiable {
         case .team: "Teams"
         case .stadium: "Stadiums"
         case .player: "Players"
+        case .tactic: "Tactics"
         }
     }
-    var singular: String { self == .championship ? "League" : rawValue.capitalized }
+    var singular: String { self == .championship ? "League" : self == .tactic ? "Tactic" : rawValue.capitalized }
     var icon: String {
         switch self {
         case .country: "globe"
@@ -28,6 +29,7 @@ enum RecordKind: String, CaseIterable, Identifiable {
         case .team: "shield"
         case .stadium: "sportscourt"
         case .player: "person"
+        case .tactic: "figure.run"
         }
     }
     var nameColumn: String { self == .player ? "player_lastname" : "\(rawValue)_name" }
@@ -36,9 +38,10 @@ enum RecordKind: String, CaseIterable, Identifiable {
         case .country: [RecordField("country_name", "Name"), RecordField("country_iso3", "ISO code", type: .iso)]
         case .city: [RecordField("city_name", "Name"), RecordField("country_id", "Country", type: .relation(.country))]
         case .championship: [RecordField("championship_name", "Name"), RecordField("country_id", "Country", type: .relation(.country)), RecordField("championship_teams_number", "Number of teams", type: .number(2...128), initial: "8")]
-        case .team: [RecordField("team_name", "Name"), RecordField("city_id", "City", type: .relation(.city)), RecordField("team_foundation_date", "Founded (year)", type: .number(1800...2100), initial: "1900")]
+        case .team: [RecordField("team_name", "Name"), RecordField("city_id", "City", type: .relation(.city)), RecordField("team_foundation_date", "Founded (year)", type: .number(1800...2100), initial: "1900"), RecordField("tactic_id", "Tactic", type: .relation(.tactic), initial: "1")]
         case .stadium: [RecordField("stadium_name", "Name"), RecordField("city_id", "City", type: .relation(.city)), RecordField("stadium_foundation", "Opened (year)", type: .number(1800...2100), initial: "2000"), RecordField("stadium_seats", "Number of seats", type: .number(0...1_000_000), initial: "0")]
         case .player: [RecordField("player_name", "First name"), RecordField("player_lastname", "Last name"), RecordField("player_dob", "Date of birth", type: .date, initial: "20000101"), RecordField("city_id", "Birth city", type: .relation(.city))]
+        case .tactic: [RecordField("tactic_name", "Name"), RecordField("tactic_attack", "Attack", initial: "0"), RecordField("tactic_defense", "Defense", initial: "0")]
         }
     }
     var assignment: RecordKind? {
@@ -75,6 +78,7 @@ struct RecordDraft {
         for field in kind.fields {
             let value = (values[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if kind == .player && field.id == "player_lastname" && value.isEmpty { continue }
+            if field.id == "tactic_id" && value.isEmpty { continue }
             if value.isEmpty { return "Enter \(field.label.lowercased())." }
             switch field.type {
             case .text:
@@ -123,6 +127,13 @@ final class FootballDatabase {
             try migratePositions()
             try migratePlayerValues()
             try execute("CREATE TABLE IF NOT EXISTS stadium_team (id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, team_id INTEGER REFERENCES team(id), stadium_id INTEGER REFERENCES stadium(id))")
+            try execute("CREATE TABLE IF NOT EXISTS tactic (id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL, tactic_name TEXT UNIQUE NOT NULL, tactic_attack REAL NOT NULL, tactic_defense REAL NOT NULL)")
+            try execute("CREATE TABLE IF NOT EXISTS player_contract (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE, player_contract_start_date INTEGER NOT NULL, player_contract_end_date INTEGER NOT NULL, player_id REFERENCES player (id) NOT NULL, team_id REFERENCES team (id) NOT NULL, player_contract_value INTEGER NOT NULL, player_contract_weekly_wage INTEGER NOT NULL)")
+            try execute("INSERT OR IGNORE INTO tactic (tactic_name, tactic_attack, tactic_defense) VALUES ('Attacking',0.22,-0.12),('Balanced',0.0,0.0),('Defensive',-0.18,0.20)")
+            let teamColumns = try rows("PRAGMA table_info(team)")
+            if !teamColumns.contains(where: { $0["name"] == "tactic_id" }) {
+                try execute("ALTER TABLE team ADD COLUMN tactic_id INTEGER REFERENCES tactic(id)")
+            }
             try execute("CREATE TABLE IF NOT EXISTS stadium_improvement (id INTEGER PRIMARY KEY UNIQUE NOT NULL, stadium_id INTEGER REFERENCES stadium(id), stadium_impr_add_seats INTEGER, stadium_impr_date INTEGER)")
             let columns = try rows("PRAGMA table_info(stadium)")
             if !columns.isEmpty, !columns.contains(where: { $0["name"] == "stadium_seats" }) {
@@ -201,7 +212,7 @@ final class FootballDatabase {
     func clearWorld() throws {
         try execute("SAVEPOINT clear_world")
         do {
-            for table in ["stadium_team", "stadium_improvement", "player_value", "player_position", "player_stats", "player_skills_physical", "player_skills_mental", "team_players", "championship_teams", "player", "team", "stadium", "manager", "championship", "city", "country"] {
+            for table in ["player_contract", "stadium_team", "stadium_improvement", "player_value", "player_position", "player_stats", "player_skills_physical", "player_skills_mental", "team_players", "championship_teams", "player", "team", "stadium", "manager", "championship", "city", "country"] {
                 try execute("DELETE FROM \(table)")
             }
             // Remember the explicit clear so startup does not silently restore countries.
@@ -282,11 +293,11 @@ final class FootballDatabase {
         }
         return stmt
     }
-    private func execute(_ sql: String, _ values: [String] = []) throws {
+    func execute(_ sql: String, _ values: [String] = []) throws {
         let stmt = try statement(sql, values); defer { sqlite3_finalize(stmt) }
         guard sqlite3_step(stmt) == SQLITE_DONE else { throw issue() }
     }
-    private func rows(_ sql: String, _ values: [String] = []) throws -> [[String: String]] {
+    func rows(_ sql: String, _ values: [String] = []) throws -> [[String: String]] {
         let stmt = try statement(sql, values); defer { sqlite3_finalize(stmt) }
         var result: [[String: String]] = []
         while true {
@@ -339,9 +350,9 @@ final class FootballDatabase {
             }
             let dependents: [(String, String)]
             switch kind {
-            case .player: dependents = [("player_value", "player_id"), ("player_position", "player_id"), ("team_players", "player_id"), ("player_skills_physical", "player_id"), ("player_skills_mental", "player_id"), ("player_stats", "player_id")]
+            case .player: dependents = [("player_contract", "player_id"), ("player_value", "player_id"), ("player_position", "player_id"), ("team_players", "player_id"), ("player_skills_physical", "player_id"), ("player_skills_mental", "player_id"), ("player_stats", "player_id")]
             case .stadium: dependents = [("stadium_team", "stadium_id"), ("stadium_improvement", "stadium_id")]
-            case .team: dependents = [("stadium_team", "team_id"), ("team_players", "team_id"), ("championship_teams", "team_id")]
+            case .team: dependents = [("player_contract", "team_id"), ("stadium_team", "team_id"), ("team_players", "team_id"), ("championship_teams", "team_id")]
             case .championship: dependents = [("championship_teams", "championship_id")]
             default: dependents = []
             }
@@ -598,13 +609,16 @@ extension FootballDatabase {
             }
             let player = try create(.player, values, assignment: "\(team)")
             try execute("INSERT INTO player_position (player_id,position_id,player_position_strong,player_position_acquired,player_position_date_from) VALUES (?,?,1,0,?)", [String(player), positionID, RecordDraft.dateFormatter.string(from: Date())])
+            let contractStart = Calendar.current.component(.year, from: Date())
+            let contractLength = [2, 3].randomElement() ?? 2
+            try execute("INSERT INTO player_contract (player_contract_start_date, player_contract_end_date, player_id, team_id, player_contract_value, player_contract_weekly_wage) VALUES (?,?,?,?,?,?)", [String(contractStart), String(contractStart + contractLength), String(player), String(team), String(Int.random(in: 1...100)), String(Int.random(in: 10...50))])
 
         }
         try execute("BEGIN IMMEDIATE")
         do {
             if replaceAll && kind != .city {
                 // Preserve lookup definitions; remove the world in foreign-key order.
-                for table in ["stadium_team", "stadium_improvement", "player_value", "player_position", "player_stats", "player_skills_physical", "player_skills_mental", "team_players", "championship_teams", "player", "team", "stadium", "manager", "championship", "city", "country"] {
+                for table in ["player_contract", "stadium_team", "stadium_improvement", "player_value", "player_position", "player_stats", "player_skills_physical", "player_skills_mental", "team_players", "championship_teams", "player", "team", "stadium", "manager", "championship", "city", "country"] {
                     try execute("DELETE FROM \(table)")
                 }
                 for type in RecordKind.allCases { cache[type] = [] }
@@ -648,6 +662,8 @@ extension FootballDatabase {
                     let target = try rows("SELECT t.id FROM team t LEFT JOIN team_players tp ON tp.team_id=t.id GROUP BY t.id ORDER BY COUNT(tp.id),t.id LIMIT 1").first?["id"]
                     guard let target, let team = Int(target) else { throw DatabaseIssue(message: "Create a team before generating players.") }
                     try newPlayer(team: team)
+                case .tactic:
+                    _ = try create(.tactic, ["tactic_name": uniqueName(.tactic, "Sample Tactic"), "tactic_attack": "0", "tactic_defense": "0"])
                 }
             }
             try execute("COMMIT")

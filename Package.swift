@@ -11,7 +11,7 @@ let package = Package(
             name: "ElevenHeroes",
             dependencies: ["CSQLite"],
             path: ".",
-            exclude: ["Tests", "scripts", "README.md", "REVIEW.md", "dist", "Sources/CSQLite", "skills-lock.json", "db/player_profiles.csv", "db/team_details.csv", "db/countries.csv"],
+            exclude: ["Tests", "scripts", "README.md", "REVIEW.md", "GAMELOGIC.md", "dist", "Sources/CSQLite", "skills-lock.json", "db/player_profiles.csv", "db/team_details.csv", "db/countries.csv"],
             sources: ["Sources/ElevenHeroes"],
             resources: [.copy("db/db.sqlite"), .copy("db/player_profiles.json"), .copy("db/countries.json"), .copy("db/team_details.json")]
         ),

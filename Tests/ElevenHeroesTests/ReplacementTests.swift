@@ -30,7 +30,7 @@ struct ReplacementTests {
         #expect(try db.attributeChoices()["player_foot_id"]?.map(\.name) == feet)
         _ = try db.generate(.country, count: 2, replaceAll: true)
         #expect(try db.records(.country).count == 2)
-        for kind in RecordKind.allCases where kind != .country { #expect(try db.records(kind).isEmpty) }
+        for kind in RecordKind.allCases where kind != .country && kind != .tactic { #expect(try db.records(kind).isEmpty) }
         var statement: OpaquePointer?
         #expect(sqlite3_prepare_v2(handle, "PRAGMA foreign_key_check", -1, &statement, nil) == SQLITE_OK)
         #expect(sqlite3_step(statement) == SQLITE_DONE)

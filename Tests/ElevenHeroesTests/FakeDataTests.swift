@@ -77,7 +77,7 @@ struct FakeDataTests {
         #expect(sqlite3_exec(handle, "CREATE TRIGGER fail_player BEFORE INSERT ON player WHEN (SELECT count(*) FROM player)>=1 BEGIN SELECT RAISE(ABORT,'Injected failure'); END;", nil, nil, nil) == SQLITE_OK)
         let db = try FootballDatabase(url: url, writable: true)
         #expect(throws: (any Error).self) { try db.generate(.team, count: 2) }
-        for kind in RecordKind.allCases { #expect(try db.records(kind).count == (kind == .country ? 249 : 0)) }
+        for kind in RecordKind.allCases { #expect(try db.records(kind).count == (kind == .country ? 249 : kind == .tactic ? 3 : 0)) }
         #expect(sqlite3_exec(handle, "DROP TRIGGER fail_player", nil, nil, nil) == SQLITE_OK)
         _ = try db.generate(.team, count: 2)
         #expect(try db.records(.player).count == 44)
