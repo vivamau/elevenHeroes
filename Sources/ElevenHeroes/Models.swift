@@ -280,13 +280,35 @@ enum Database {
         }
     }
     static func role(_ index: Int) -> String { index < 2 ? "GK" : index < 8 ? "DEF" : index < 14 ? "MID" : "FWD" }
-    static func generateFictionalLeague<R: RandomNumberGenerator>(using rng: inout R) -> [Club] {
+    private static func fictionalNames(from resource: String) throws -> [String] {
+        #if SWIFT_PACKAGE
+        let bundle = Bundle.module
+        #else
+        let bundle = Bundle.main
+        #endif
+        guard let url = bundle.url(forResource: resource, withExtension: "txt"),
+              let contents = try? String(contentsOf: url, encoding: .utf8) else {
+            throw DatabaseIssue(message: "Could not read \(resource).txt. Rebuild or reinstall the app.")
+        }
+        return contents.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+    static func generateFictionalLeague<R: RandomNumberGenerator>(using rng: inout R) throws -> [Club] {
         let templates = demo
-        var names = templates.flatMap(\.players).map(\.name).shuffled(using: &rng)
+        let playerCount = templates.reduce(0) { $0 + $1.players.count }
+        let firstNames = try fictionalNames(from: "human_male_names")
+        let surnames = try fictionalNames(from: "halfling_surnames")
+        var availableFirstNames = Set(firstNames).sorted().shuffled(using: &rng)
+        guard availableFirstNames.count >= playerCount, !surnames.isEmpty else {
+            throw DatabaseIssue(message: "The bundled name lists have too few entries to generate a fictional league.")
+        }
         return templates.map { club in
             let colors = TeamKits.generated(using: &rng)
             return Club(id: club.id, name: club.name, city: club.city, players: club.players.map { player in
-                Footballer(id: player.id, name: names.removeLast(), role: player.role,
+                let firstName = availableFirstNames.removeLast()
+                let surname = surnames[Int.random(in: surnames.indices, using: &rng)]
+                return Footballer(id: player.id, name: "\(firstName) \(surname)", role: player.role,
                            rating: Int.random(in: 50...89, using: &rng), marketValue: Int.random(in: 1...100, using: &rng))
             }, teamColorPrimary: colors.0, teamColorSecondary: colors.1)
         }

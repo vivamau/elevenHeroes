@@ -5,7 +5,7 @@ import CSQLite
 
 struct MarketTests {
     @Test func salesStopAtSixteenAndReplaceSoldStarter() throws {
-        var career = season()
+        var career = try season()
         career.lineup = Array(career.clubs[0].players.prefix(11).map(\.id))
         let player = try #require(career.clubs[0].players.first { $0.role != "GK" })
         let buyer = try #require(career.saleBuyer?.id)
@@ -54,14 +54,14 @@ struct MarketTests {
         #expect(store.season?.clubs[0].players.contains(next) == true)
     }
 
-    private func season() -> Season {
+    private func season() throws -> Season {
         var rng = SeasonTests.Seeded()
-        let clubs = Database.generateFictionalLeague(using: &rng)
+        let clubs = try Database.generateFictionalLeague(using: &rng)
         return Season(clubs: clubs, fixtures: Season.schedule(clubs), selectedClub: 1, demo: true)
     }
 
     @Test func transferMovesPlayerAndChargesOfferExactlyOnce() throws {
-        var career = season()
+        var career = try season()
         let player = try #require(career.clubs[1].players.first { $0.role != "GK" })
         let offer = (player.creditsValue * 120 + 99) / 100
         try career.buyPlayer(player.id, offer: offer)
@@ -81,14 +81,14 @@ struct MarketTests {
         player.salary = 5
         let restored = try JSONDecoder().decode(Footballer.self, from: JSONEncoder().encode(player))
         #expect(restored.currentSalary == 10)
-        var career = season()
+        var career = try season()
         let target = try #require(career.clubs[1].players.first { $0.role != "GK" })
         try career.buyPlayer(target.id, offer: (target.creditsValue * 120 + 99) / 100, salary: 10)
         #expect(career.clubs[0].players.first { $0.id == target.id }?.currentSalary == 10)
     }
 
     @Test func purchaseSalaryIsValidatedAndSaved() throws {
-        var career = season()
+        var career = try season()
         let player = try #require(career.clubs[1].players.first { $0.role != "GK" })
         let offer = (player.creditsValue * 120 + 99) / 100
         let original = career.clubs
@@ -107,7 +107,7 @@ struct MarketTests {
     }
 
     @Test func rejectedOffersLeaveBalanceAndSquadsIntact() throws {
-        var career = season()
+        var career = try season()
         let player = try #require(career.clubs[1].players.first { $0.role != "GK" })
         let squads = career.clubs
         #expect(throws: (any Error).self) { try career.buyPlayer(player.id, offer: player.creditsValue - 1) }
@@ -118,7 +118,7 @@ struct MarketTests {
     }
 
     @Test func playersOutsideLeagueCanTransferAndLegacySavesRemainReadable() throws {
-        var career = season()
+        var career = try season()
         let player = Footballer(id: 99999, name: "Outside player", role: "MID", rating: 60, marketValue: 25)
         career.marketPlayers = [MarketPlayer(player: player, clubID: 999, clubName: "Outside club")]
         try career.buyPlayer(player.id, offer: 30)

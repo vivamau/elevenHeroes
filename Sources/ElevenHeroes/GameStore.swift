@@ -96,8 +96,12 @@ import Foundation
     }
     func generateCareerData() {
         var rng = SystemRandomNumberGenerator()
-        available = Database.generateFictionalLeague(using: &rng)
-        isDemo = true
+        do {
+            available = try Database.generateFictionalLeague(using: &rng)
+            isDemo = true
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
     func useDatabase() {
         available = []
