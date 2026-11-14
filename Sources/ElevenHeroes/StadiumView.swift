@@ -47,7 +47,7 @@ struct StadiumView: View {
                         }
                         Button("Improve stadium") {
                             improve()
-                        }.buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                        }.gamePrimaryAction()
                             .disabled(cost == nil || (cost ?? 0) > season.credits)
                     }
                 }
@@ -75,9 +75,6 @@ struct StadiumView: View {
     }
 }
 
-private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-    VStack(alignment: .leading, spacing: 20) {
-        Text(title.uppercased()).font(.system(size: 11, weight: .bold)).tracking(1.7).foregroundStyle(.secondary)
-        content()
-    }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+@MainActor private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    GameCard(title: title, content: content)
 }

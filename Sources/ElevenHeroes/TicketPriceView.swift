@@ -42,15 +42,15 @@ struct SeasonTicketSetupView: View {
                 Divider()
                 MatchParametersEditor(parameters: $parameters)
                 HStack {
-                    Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                    Button("Cancel", role: .cancel) { dismiss() }.gamePrimaryAction().keyboardShortcut(.cancelAction)
                     Spacer()
                     Button { onStart(price, parameters); dismiss() } label: {
-                        Label("Start season", systemImage: "play.fill").padding(.horizontal, 9).padding(.vertical, 7)
-                    }.buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                        Label("Start season", systemImage: "play.fill")
+                    }.gamePrimaryAction()
                         .disabled(!(1...100).contains(price))
                 }
             }.padding(24).frame(width: 520)
-        }.frame(height: 640)
+        }.frame(height: AppTheme.sheetHeight(640))
         .background(AppTheme.background)
     }
 }
@@ -67,10 +67,7 @@ struct MatchParametersEditor: View {
             sliderRow("Form weight", value: $parameters.formWeight, range: 0...0.5, step: 0.01, format: "%.2f")
             Stepper("Max goals: \(parameters.maxGoals)", value: $parameters.maxGoals, in: 4...12)
                 .font(.callout)
-            Text("Tactic modifiers").font(.caption.bold()).foregroundStyle(.secondary)
-            tacticRow("Attacking", key: "Attacking")
-            tacticRow("Balanced", key: "Balanced")
-            tacticRow("Defensive", key: "Defensive")
+            StrategyMixEditor(parameters: $parameters)
         }
         .padding(16).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 12))
     }
@@ -86,19 +83,4 @@ struct MatchParametersEditor: View {
         }
     }
 
-    private func tacticRow(_ title: String, key: String) -> some View {
-        let binding = Binding<Double>(
-            get: { parameters.tactics[key]?.attack ?? 0 },
-            set: { newValue in
-                var profile = parameters.tactics[key] ?? TacticProfile(attack: 0, defense: 0)
-                profile.attack = newValue
-                parameters.tactics[key] = profile
-            }
-        )
-        return HStack {
-            Text(title).font(.callout).frame(width: 100, alignment: .leading)
-            Slider(value: binding, in: -0.3...0.3, step: 0.01)
-            Text(String(format: "%.2f", binding.wrappedValue)).monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
-        }
-    }
 }

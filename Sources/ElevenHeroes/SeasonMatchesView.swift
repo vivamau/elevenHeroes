@@ -96,6 +96,10 @@ struct SeasonMatchesView: View {
                                 if let id = event.scorerID, let name = event.scorerName {
                                     PlayerNameLink(id: id, name: name, career: career, teamName: event.clubName).fontWeight(.medium)
                                 } else { Text(event.scorerName ?? "Scorer not recorded") }
+                                if let description = event.goalDescription {
+                                    Text(description).font(.callout).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                                 if let id = event.assistID, let name = event.assistName {
                                     HStack(spacing: 4) {
                                         Text("Assist:").foregroundStyle(.secondary)
@@ -113,6 +117,6 @@ struct SeasonMatchesView: View {
                 Label("Scorers and assists were not recorded for this match.", systemImage: "info.circle")
                     .font(.callout).foregroundStyle(.secondary)
             }
-        }.padding(20).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(20).gameSurface()
     }
 }

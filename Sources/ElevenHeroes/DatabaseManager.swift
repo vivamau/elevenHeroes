@@ -131,6 +131,18 @@ final class FootballDatabase {
             try execute("CREATE TABLE IF NOT EXISTS player_contract (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE, player_contract_start_date INTEGER NOT NULL, player_contract_end_date INTEGER NOT NULL, player_id REFERENCES player (id) NOT NULL, team_id REFERENCES team (id) NOT NULL, player_contract_value INTEGER NOT NULL, player_contract_weekly_wage INTEGER NOT NULL)")
             try execute("INSERT OR IGNORE INTO tactic (tactic_name, tactic_attack, tactic_defense) VALUES ('Attacking',0.22,-0.12),('Balanced',0.0,0.0),('Defensive',-0.18,0.20)")
             let teamColumns = try rows("PRAGMA table_info(team)")
+            for column in ["team_color_primary", "team_color_secondary"] where !teamColumns.contains(where: { $0["name"] == column }) {
+                try execute("ALTER TABLE team ADD COLUMN \(column) TEXT")
+            }
+            for team in try rows("SELECT id,team_color_primary,team_color_secondary FROM team") {
+                let fallback = TeamKits.fallback(id: Int(team["id"] ?? "0") ?? 0)
+                let primary = team["team_color_primary"] ?? ""
+                let secondary = team["team_color_secondary"] ?? ""
+                if primary.isEmpty || secondary.isEmpty {
+                    try execute("UPDATE team SET team_color_primary=?,team_color_secondary=? WHERE id=?",
+                                [primary.isEmpty ? fallback.0 : primary, secondary.isEmpty ? fallback.1 : secondary, team["id"] ?? "0"])
+                }
+            }
             if !teamColumns.contains(where: { $0["name"] == "tactic_id" }) {
                 try execute("ALTER TABLE team ADD COLUMN tactic_id INTEGER REFERENCES tactic(id)")
             }
@@ -397,6 +409,12 @@ final class FootballDatabase {
         var values = kind.fields.map { field in
             let value = (draft.values[field.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             return field.id == "country_iso3" ? value.uppercased() : value
+        }
+        if kind == .team, draft.id == nil {
+            var rng = SystemRandomNumberGenerator()
+            let colors = TeamKits.generated(using: &rng)
+            columns += ["team_color_primary", "team_color_secondary"]
+            values += [colors.0, colors.1]
         }
         if kind == .player, draft.id == nil {
             columns.append("player_initial_salary")

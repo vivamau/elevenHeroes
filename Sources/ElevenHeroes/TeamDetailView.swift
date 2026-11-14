@@ -13,7 +13,7 @@ struct TeamDetailView: View {
             PlayerDetailView(player: player, career: career, teamName: club.name, backLabel: "Back to team", onTeam: { selectedPlayer = nil }) { selectedPlayer = nil }
         } else {
         VStack(alignment: .leading, spacing: 24) {
-            Button(action: onBack) { Label(backLabel, systemImage: "chevron.left") }
+            Button(action: onBack) { Label(backLabel, systemImage: "chevron.left") }.keyboardShortcut("[", modifiers: .command)
                 .buttonStyle(.plain).foregroundStyle(AppTheme.accent)
             HStack(spacing: 18) {
                 Group {

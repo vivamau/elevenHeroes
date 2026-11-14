@@ -5,9 +5,9 @@ extension ContentView {
         VStack(spacing: 22) {
             HStack(spacing: 16) {
                 let row = s.standings.first { $0.id == s.selectedClub }
-                metric("LEAGUE POSITION", "\((s.standings.firstIndex { $0.id == s.selectedClub } ?? 0)+1)", "of \(s.clubs.count) clubs")
-                metric("POINTS", "\(row?.points ?? 0)", "\(row?.played ?? 0) matches played")
-                metric("GOAL DIFFERENCE", String(format: "%+d", row?.difference ?? 0), "\(row?.scored ?? 0) scored · \(row?.conceded ?? 0) conceded")
+                metric("League position", "\((s.standings.firstIndex { $0.id == s.selectedClub } ?? 0)+1)", "of \(s.clubs.count) clubs")
+                metric("Points", "\(row?.points ?? 0)", "\(row?.played ?? 0) matches played")
+                metric("Goal difference", String(format: "%+d", row?.difference ?? 0), "\(row?.scored ?? 0) scored · \(row?.conceded ?? 0) conceded")
             }
             HStack(alignment: .top, spacing: 22) {
                 VStack(spacing: 22) {
@@ -39,7 +39,7 @@ extension ContentView {
                     if s.goalkeepersNeeded > 0 {
                         card("Goalkeeper cover") {
                             Text("Your squad needs \(s.goalkeepersNeeded) more goalkeeper(s). Every team must have at least two.")
-                            Button("Buy a goalkeeper in Market") { store.screen = "Market" }.buttonStyle(.borderedProminent)
+                            Button("Buy a goalkeeper in Market") { store.screen = "Market" }.gamePrimaryAction()
                         }
                     }
                     if s.replacementsNeeded > 0 {
@@ -49,7 +49,7 @@ extension ContentView {
                                 PlayerNameLink(id: record.id, name: record.player.name, career: s, player: record.player, teamName: "Retired · \(String(record.year))")
                             }
                             Button("Find replacements in Market") { store.screen = "Market" }
-                                .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                                .gamePrimaryAction()
                         }
                     }
                     let expiring = (s.clubs.first { $0.id == s.selectedClub }?.players ?? []).filter { ($0.contractEndDate ?? Int.max) <= s.year + 1 }
@@ -60,21 +60,29 @@ extension ContentView {
                                 PlayerNameLink(id: player.id, name: player.name, career: s, player: player, teamName: "Contract until \(player.contractEndDate ?? s.year)")
                                     .foregroundStyle(.orange)
                             }
-                            Button("Review in Squad") { store.screen = "Squad" }.buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                            Button("Review in Squad") { store.screen = "Squad" }.gamePrimaryAction()
                         }
                     }
                     card("Manager's notebook") {
                         Text("Build your starting XI, choose your approach, and play through a home-and-away league season.").foregroundStyle(.secondary)
                         Label("\(s.lineup.count) / 11 starters selected", systemImage: "person.crop.rectangle.stack").foregroundStyle(s.lineup.count == 11 ? AppTheme.accent : .orange)
-                        Text("Player roles are assigned because the source schema has no position field. Ratings use physical attributes on an assumed 1–20 scale.").font(.caption).foregroundStyle(.secondary)
+                        Text("Select 11 starters before playing. Review contracts and squad cover here between matches.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 card("Tactical board · 4–4–2") {
                     pitch(s)
-                    Picker("Approach", selection: Binding(get: { store.season?.tactic ?? "Balanced" }, set: { store.season?.tactic = $0; store.save() })) {
-                        Text("Defensive").tag("Defensive"); Text("Balanced").tag("Balanced"); Text("Attacking").tag("Attacking")
-                    }.pickerStyle(.segmented)
-                    Text("Attacking raises chances at both ends. Defensive reduces them. Your selected XI determines team strength.").font(.caption).foregroundStyle(.secondary)
+                    Text("Season strategy").font(.headline)
+                    ForEach(StrategyMix.names, id: \.self) { name in
+                        HStack {
+                            Text(name)
+                            Spacer()
+                            Text((s.matchParameters ?? .default).strategyMix.value(for: name).formatted(.percent.precision(.fractionLength(0))))
+                                .monospacedDigit().foregroundStyle(.secondary)
+                        }.font(.callout)
+                    }
+                    Button("Edit season strategy", systemImage: "slider.horizontal.3") { store.screen = "Training" }
+                        .gamePrimaryAction()
+                    Text("Your starting XI determines team strength. The strategy mix shapes chances at both ends.").font(.caption).foregroundStyle(.secondary)
                 }.frame(width: 340)
             }
         }

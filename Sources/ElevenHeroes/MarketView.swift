@@ -67,7 +67,7 @@ struct MarketView: View {
                             .font(.callout).foregroundStyle(.secondary)
                         Text("No out-of-contract players are currently available.")
                             .font(.caption).foregroundStyle(.secondary)
-                    }.padding(20).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+                    }.padding(20).gameSurface()
                 } else { browser(listings) }
             }
         }
@@ -155,7 +155,7 @@ struct MarketView: View {
                                 } description: {
                                     Text(search.isEmpty ? "There are no players in this list." : "Try another name, club or position.")
                                 } actions: {
-                                    if !search.isEmpty { Button("Clear search") { search = "" } }
+                                    if !search.isEmpty { Button("Clear search") { search = "" }.gamePrimaryAction() }
                                 }.frame(maxWidth: .infinity).padding(.vertical, 50)
                             }
                         } header: { columnHeadings }
@@ -245,7 +245,7 @@ private struct MarketPlayerRow: View {
                 .frame(width: 100, alignment: .trailing)
                 .accessibilityLabel("Weekly wage \(listing.player.currentSalary) credits")
             Button(yourTeam ? (isListed ? "Listed" : "List player") : "Make offer", action: onAction)
-                .buttonStyle(.bordered).controlSize(.regular).disabled(!enabled)
+                .gamePrimaryAction().controlSize(.regular).disabled(!enabled)
                 .frame(width: 100, alignment: .trailing)
                 .help(enabled ? (yourTeam ? "Invite offers for this player" : "Review offer") : unavailableReason)
         }.padding(.horizontal, 18).padding(.vertical, 13)
@@ -322,9 +322,9 @@ private struct MarketOfferSheet: View {
                 .font(.callout).foregroundStyle(valid ? Color.secondary : Color.orange)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Cancel", role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+                Button("Cancel", role: .cancel, action: onCancel).gamePrimaryAction().keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Submit offer") { onSubmit(offer, salary) }.buttonStyle(MarketCommitButtonStyle()).disabled(!valid)
+                Button("Submit offer") { onSubmit(offer, salary) }.gamePrimaryAction().disabled(!valid)
             }.controlSize(.large)
         }.padding(28).frame(width: 500).background(AppTheme.background)
     }
@@ -334,17 +334,5 @@ private struct MarketOfferSheet: View {
             Spacer(minLength: 20)
             Text(value).fontWeight(.medium).monospacedDigit().foregroundStyle(highlighted ? AppTheme.accent : .primary)
         }.font(.callout)
-    }
-}
-
-struct MarketCommitButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.body.weight(.semibold))
-            .padding(.horizontal, 18).padding(.vertical, 10)
-            .foregroundStyle(isEnabled ? AppTheme.background : Color.secondary)
-            .background(isEnabled ? AppTheme.accent.opacity(configuration.isPressed ? 0.75 : 1) : Color.white.opacity(0.08), in: Capsule())
-            .contentShape(Capsule())
     }
 }

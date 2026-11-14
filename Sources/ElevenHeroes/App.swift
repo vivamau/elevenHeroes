@@ -15,7 +15,7 @@ import UniformTypeIdentifiers
     @State private var store = GameStore()
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store).frame(minWidth: 1040, minHeight: 700).preferredColorScheme(.dark)
+            ContentView(store: store).frame(minWidth: 1040, minHeight: 700).preferredColorScheme(.dark).tint(AppTheme.accent).buttonStyle(GameActionButtonStyle())
         }.defaultSize(width: 1320, height: 850)
         .commands { CommandGroup(replacing: .newItem) { Button("Import Football Database…") { store.importing = true }.keyboardShortcut("o")
             Button("Load Career…") { store.loadingCareer = true }.keyboardShortcut("o", modifiers: [.command, .shift])
@@ -39,14 +39,14 @@ struct ContentView: View {
     private var gameContent: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                GameBrand().padding(.bottom, 45)
-                Text("MANAGER'S OFFICE").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary).tracking(2).padding(.bottom, 16)
+                GameBrand().padding(.bottom, 28)
+                SectionCaption("Manager’s office").padding(.bottom, 16)
                 ForEach([("Overview", "square.grid.2x2"),("Squad", "person.3"),("Market", "arrow.left.arrow.right"),("Match Centre", "sportscourt"),("League Table", "list.number"),("Stadium", "building.2"),("Training", "figure.run")], id: \.0) { title, icon in
                     Button { viewedSeason = nil; viewedPlayer = nil; viewedTeam = nil; store.screen = title } label: {
                         Label(title, systemImage: icon).font(.system(size: 14, weight: .semibold)).frame(maxWidth: .infinity, alignment: .leading).padding(14)
                             .background(store.screen == title ? AppTheme.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
                             .foregroundStyle(store.screen == title ? AppTheme.accent : .secondary)
-                    }.buttonStyle(.plain).padding(.bottom, 5)
+                    }.buttonStyle(.plain).accessibilityAddTraits(store.screen == title ? .isSelected : []).padding(.bottom, 5)
                 }
                 Spacer()
                 if let s = store.season {
@@ -66,7 +66,7 @@ struct ContentView: View {
                     HStack {
                         Text("CLUB FOOTBALL / \(store.screen.uppercased())").font(.system(size: 10, weight: .bold)).tracking(2).foregroundStyle(.secondary)
                         Spacer()
-                        Label("LOCAL SAVE", systemImage: "checkmark.circle").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+                        Label("LOCAL CAREER", systemImage: "internaldrive").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
                     }
                     if let archived = viewedSeason {
                         SeasonHistoryView(season: archived, fallbackClubs: store.season?.clubs ?? [], career: store.season) { viewedSeason = nil }
@@ -106,7 +106,7 @@ struct ContentView: View {
                                             }
                                         }.frame(width: 44, height: 44)
                                     }
-                                    Text(store.screen == "Market" ? "Transfer market" : store.screen == "Squad" ? store.name(season.selectedClub) : store.screen == "Overview" ? "Every match. Your story." : store.screen == "Match Centre" ? matchCentreTitle(season) : store.screen).font(.system(size: 35, weight: .bold, design: .rounded))
+                                    Text(store.screen == "Market" ? "Transfer market" : store.screen == "Squad" ? store.name(season.selectedClub) : store.screen == "Overview" ? "Every match. Your story." : store.screen == "Match Centre" ? matchCentreTitle(season) : store.screen).font(.system(size: 28, weight: .bold, design: .rounded))
                                 }
                                 Text(store.screen == "Market" ? "Build your squad. Make every credit count." : season.finished ? "Season \(season.yearLabel) complete. Ready for the next chapter." : "Season \(season.yearLabel) · Matchweek \(season.round) · \(store.name(season.selectedClub))").foregroundStyle(.secondary)
                             }
@@ -114,14 +114,23 @@ struct ContentView: View {
                             if season.finished && store.screen != "Market" {
                                 Button { settingTicketPrice = true } label: {
                                     Label("Start season \(String(season.year + 1))", systemImage: "play.fill")
-                                        .padding(.horizontal, 9).padding(.vertical, 7)
+
                                 }
-                                    .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                                    .gamePrimaryAction()
                                     .help("Keep your squad and budget. Players age one year and a new fixture schedule begins.")
                             }
                             if !season.finished && store.screen != "Market" {
-                                Button(action: store.play) { Label("Play matchweek", systemImage: "play.fill").padding(.horizontal, 9).padding(.vertical, 7) }
-                                    .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background).disabled(season.lineup.count != 11 || season.replacementsNeeded > 0 || season.goalkeepersNeeded > 0)
+                                VStack(alignment: .trailing, spacing: 6) {
+                                    Button(action: store.play) { Label("Play matchweek", systemImage: "play.fill") }
+                                        .gamePrimaryAction().disabled(season.lineup.count != 11 || season.replacementsNeeded > 0 || season.goalkeepersNeeded > 0)
+                                    if season.goalkeepersNeeded > 0 {
+                                        Text("Add goalkeeper cover in Market").font(.caption).foregroundStyle(.orange)
+                                    } else if season.replacementsNeeded > 0 {
+                                        Text("Replace retired players in Market").font(.caption).foregroundStyle(.orange)
+                                    } else if season.lineup.count != 11 {
+                                        Text("Select 11 starters in Squad").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
                             }
                         }
                         switch store.screen {
@@ -134,7 +143,7 @@ struct ContentView: View {
                         default: overview(season)
                         }
                     } else { onboarding }
-                }.padding(36)
+                }.padding(28)
             }
         }.background(AppTheme.background)
     }
@@ -147,12 +156,16 @@ struct ContentView: View {
             }
         }
         .alert("Eleven Heroes", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button("OK") { store.error = nil } } message: { Text(store.error ?? "") }
+        .sheet(item: $store.liveMatch) { match in
+            LiveMatchView(match: store.liveMatch ?? match, onFinish: { store.liveMatch = nil },
+                          onStrategyChange: store.changeMatchStrategy, onSubstitute: store.makeMatchSubstitution)
+        }
         .sheet(isPresented: $settingTicketPrice) {
             if let season = store.season {
                 SeasonTicketSetupView(year: season.year + 1, price: season.homeTicketPrice, parameters: season.matchParameters ?? .default, onStart: { price, parameters in store.startNextSeason(ticketPrice: price, matchParameters: parameters) })
             }
         }
-        .sheet(isPresented: $newCareer) { VStack { onboarding; Button("Cancel") { careerPreview = nil; store.prepareCareer(); newCareer = false }.keyboardShortcut(.cancelAction) }.padding(30).frame(width: 650, height: 820) }
+        .sheet(isPresented: $newCareer) { VStack { onboarding; Button("Cancel", role: .cancel) { careerPreview = nil; store.prepareCareer(); newCareer = false }.gamePrimaryAction().keyboardShortcut(.cancelAction) }.padding(30).frame(width: 650, height: 820) }
         .onChange(of: store.managingDatabase) { _, requested in
             if requested { newCareer = false }
         }
@@ -207,23 +220,23 @@ struct ContentView: View {
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button("Generate fictional data", systemImage: "sparkles") {
                     store.generateCareerData()
-                }.buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background).controlSize(.large)
+                }.gamePrimaryAction().controlSize(.large)
                 Divider()
                 Label("Use your football database", systemImage: "externaldrive").font(.headline)
                 if store.databaseClubs.isEmpty {
                     Text("Your database has no clubs yet. Use Manage database in the sidebar to add them, or import a populated database.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Button("Use database clubs (\(store.careerReadyClubs.count) ready)") { store.useDatabase() }
+                    Button("Use database clubs (\(store.careerReadyClubs.count) ready)") { store.useDatabase() }.gamePrimaryAction()
                         .controlSize(.large)
                 }
                 if !store.incompleteClubs.isEmpty {
                     Text("Excluded until they have 11 players: " + store.incompleteClubs.map { "\($0.name) (\($0.players.count)/11)" }.joined(separator: ", "))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(3)
                         .help(store.incompleteClubs.map { "\($0.name): \($0.players.count)/11 players" }.joined(separator: "\n"))
-                    Button("Manage database…") { store.openDatabaseManager() }
+                    Button("Manage database…") { store.openDatabaseManager() }.gamePrimaryAction()
                 }
-                Button("Import database…") { store.importing = true }
+                Button("Import database…") { store.importing = true }.gamePrimaryAction()
                 Text("Your current career stays saved until you choose a club. Generated data is saved with the career; your database is unchanged.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
@@ -246,7 +259,7 @@ struct ContentView: View {
                                     Text(club.name).font(.headline)
                                     Text("\(club.players.count) players · \(Int(club.strength)) OVR").font(.caption).foregroundStyle(.secondary)
                                 }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
-                            }.buttonStyle(.bordered).tint(AppTheme.accent)
+                            }.gamePrimaryAction().tint(AppTheme.accent)
                         }
                     }
                 }.frame(height: 360)
@@ -291,10 +304,7 @@ struct ContentView: View {
             .buttonStyle(.plain).help("View team and squad")
     }
     func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(title.uppercased()).font(.system(size: 11, weight: .bold)).tracking(1.7).foregroundStyle(.secondary)
-            content()
-        }.padding(24).frame(maxWidth: .infinity, alignment: .leading).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        GameCard(title: title, content: content)
     }
     func matchCentreTitle(_ season: Season) -> String {
         let fixture = season.fixtures.first { $0.round == season.round - 1 && $0.homeGoals != nil && ($0.home == season.selectedClub || $0.away == season.selectedClub) }

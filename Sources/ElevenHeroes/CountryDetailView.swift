@@ -8,7 +8,7 @@ struct CountryDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Button(action: onBack) { Label("Back to countries", systemImage: "chevron.left") }
+            Button(action: onBack) { Label("Back to countries", systemImage: "chevron.left") }.keyboardShortcut("[", modifiers: .command)
                 .buttonStyle(.plain).foregroundStyle(AppTheme.accent)
             HStack(spacing: 18) {
                 Image(systemName: "globe").font(.system(size: 36)).foregroundStyle(AppTheme.accent)

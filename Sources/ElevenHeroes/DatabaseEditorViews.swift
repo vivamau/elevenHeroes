@@ -109,7 +109,7 @@ struct RecordEditor: View {
                 Label("Saved on this Mac", systemImage: "internaldrive")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
+                Button("Cancel", role: .cancel, action: cancel).gamePrimaryAction().keyboardShortcut(.cancelAction)
                 Button(draft.id == nil ? "Create \(draft.kind.singular.lowercased())" : "Save changes", action: save)
                     .gamePrimaryAction().keyboardShortcut(.defaultAction)
             }.controlSize(.large).padding(.horizontal, 24).padding(.vertical, 16)
@@ -144,7 +144,7 @@ struct RecordEditor: View {
                         draft.values.merge(try PlayerAttributes.randomized(choices: attributeChoices)) { _, new in new }
                         error = nil
                     } catch { self.error = error.localizedDescription }
-                }.help("Randomize physical and mental skills, condition, preferred foot and morale. Changes are only applied when you save.")
+                }.gamePrimaryAction().help("Randomize physical and mental skills, condition, preferred foot and morale. Changes are only applied when you save.")
             }
             VStack(spacing: 0) {
                 ForEach(Array(attributes.enumerated()), id: \.element.id) { index, attribute in
@@ -367,9 +367,7 @@ struct FakeDataSheet: View {
                     Button(selectedNationalities.isEmpty ? "All selected" : "Clear selection") {
                         selectedNationalities.removeAll()
                     }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(selectedNationalities.isEmpty ? .secondary : AppTheme.accent)
+                    .gamePrimaryAction().controlSize(.small)
                     .disabled(selectedNationalities.isEmpty)
                 }.padding(.top, 4)
                 if availableNationalities.isEmpty {
@@ -418,7 +416,7 @@ struct FakeDataSheet: View {
             HStack {
                 if busy { ProgressView().controlSize(.small); Text("Generating…").font(.callout) }
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(busy)
+                Button("Cancel", role: .cancel) { dismiss() }.gamePrimaryAction().keyboardShortcut(.cancelAction).disabled(busy)
                 Button(kind == .city ? "Generate cities" : "Replace all data and generate") {
                     busy = true
                     Task { @MainActor in

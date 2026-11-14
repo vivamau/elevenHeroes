@@ -93,7 +93,7 @@ struct DatabaseManagerView: View {
                 HStack(alignment: .center, spacing: 14) {
                     EntityBadge(kind: kind, size: 46)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(kind.title).font(.system(size: 35, weight: .bold, design: .rounded))
+                        Text(kind.title).font(.system(size: 28, weight: .bold, design: .rounded))
                         Text("\(records[kind]?.count ?? 0) records · Available to new careers")
                             .font(.callout).foregroundStyle(.secondary)
                     }
@@ -103,7 +103,7 @@ struct DatabaseManagerView: View {
                             Label("Add \(kind.singular.lowercased())", systemImage: "plus")
                         }.gamePrimaryAction().controlSize(.large)
                         Button("Generate data…", systemImage: "sparkles") { generating = kind }
-                            .buttonStyle(.borderless)
+                            .gamePrimaryAction().controlSize(.small)
                     }
                 }.padding(24)
                 HStack(spacing: 8) {
@@ -124,8 +124,8 @@ struct DatabaseManagerView: View {
                         Text(search.isEmpty ? emptyDescription : "Try a different name or clear your search.")
                     } actions: {
                         if search.isEmpty {
-                            Button("Add \(kind.singular.lowercased())") { editing = EditorSelection(draft: RecordDraft(kind: kind)) }
-                        } else { Button("Clear search") { search = "" } }
+                            Button("Add \(kind.singular.lowercased())") { editing = EditorSelection(draft: RecordDraft(kind: kind)) }.gamePrimaryAction()
+                        } else { Button("Clear search") { search = "" }.gamePrimaryAction() }
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(filtered) { record in
@@ -147,10 +147,10 @@ struct DatabaseManagerView: View {
                             }
                             Spacer()
                             Button { edit(record) } label: { Image(systemName: "pencil") }
-                                .buttonStyle(.borderless).help("Edit \(record.title)")
+                                .gamePrimaryAction().controlSize(.small).help("Edit \(record.title)")
                                 .accessibilityLabel("Edit \(record.title)")
                             Button(role: .destructive) { deletingKind = kind; deleting = record } label: { Image(systemName: "trash") }
-                                .buttonStyle(.borderless).help("Delete \(record.title)").accessibilityLabel("Delete \(record.title)")
+                                .gamePrimaryAction().controlSize(.small).help("Delete \(record.title)").accessibilityLabel("Delete \(record.title)")
                         }.padding(.vertical, 10)
                             .listRowBackground(AppTheme.panel)
                             .contextMenu {

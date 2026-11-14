@@ -236,7 +236,7 @@ private struct LeagueStandingsView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(24)
-            .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+            .gameSurface()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
 

@@ -35,7 +35,7 @@ struct PlayerDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Button(action: onBack) { Label(backLabel, systemImage: "chevron.left") }
+            Button(action: onBack) { Label(backLabel, systemImage: "chevron.left") }.keyboardShortcut("[", modifiers: .command)
                 .buttonStyle(.plain).foregroundStyle(AppTheme.accent)
             header
             if let career {
@@ -87,7 +87,7 @@ struct PlayerDetailView: View {
                     Image(systemName: "person.fill").font(.system(size: 25)).foregroundStyle(AppTheme.accent)
                 }
             }.frame(width: 54, height: 54).clipShape(RoundedRectangle(cornerRadius: 14))
-                .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+                .gameSurface()
             VStack(alignment: .leading, spacing: 5) {
                 Text(player.name).font(.system(size: 26, weight: .semibold, design: .rounded))
                     .fixedSize(horizontal: false, vertical: true)
@@ -127,7 +127,7 @@ struct PlayerDetailView: View {
                 }
                 if onOfferRenewal != nil {
                     Button("Offer renewal") { showingRenewal = true }
-                        .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                        .gamePrimaryAction()
                 }
             }
         }
@@ -192,10 +192,10 @@ struct PlayerDetailView: View {
                     Stepper("\(years) years", value: $years, in: 1...5)
                 }
                 HStack {
-                    Button("Cancel", role: .cancel, action: onCancel).keyboardShortcut(.cancelAction)
+                    Button("Cancel", role: .cancel, action: onCancel).gamePrimaryAction().keyboardShortcut(.cancelAction)
                     Spacer()
                     Button("Submit renewal") { onSubmit(wage, years) }
-                        .buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                        .gamePrimaryAction()
                         .disabled(wage < Footballer.minimumSalary)
                 }
             }.padding(24).frame(width: 420).background(AppTheme.background)

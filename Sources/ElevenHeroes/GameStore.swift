@@ -4,6 +4,7 @@ import Foundation
 
 @MainActor @Observable final class GameStore {
     var season: Season?
+    var liveMatch: MatchPlayback?
     var error: String?
     var screen = "Overview"
     var available: [Club] = []
@@ -187,16 +188,35 @@ import Foundation
         } catch { self.error = "Could not start next season: \(error.localizedDescription)" }
     }
     func play() {
+        guard liveMatch == nil else { return }
         guard season?.goalkeepersNeeded == 0 else { error = "Buy enough goalkeepers to have at least two in your squad before playing."; return }
         guard season?.replacementsNeeded == 0 else { error = "Buy replacements for your retired players in Market before playing."; return }
         guard !(season?.clubs.flatMap(\.players).contains { $0.age(in: season?.year ?? 2026) >= 41 } ?? false) else {
             error = "This career contains players aged 41 or older. Start the next season to retire them."; return
         }
         guard season?.lineup.count == 11 else { error = "Select exactly 11 players before playing."; return }
+        if let clubs = season?.clubs {
+            for index in clubs.indices {
+                let colors = databaseClubs.first { $0.id == clubs[index].id }?.kitColors ?? clubs[index].kitColors
+                if season?.clubs[index].teamColorPrimary == nil { season?.clubs[index].teamColorPrimary = colors.0 }
+                if season?.clubs[index].teamColorSecondary == nil { season?.clubs[index].teamColorSecondary = colors.1 }
+            }
+        }
         let previousRound = season?.round
         var rng = SystemRandomNumberGenerator(); season?.simulate(using: &rng)
         if season?.round != previousRound { season?.generateIncomingOffers(using: &rng) }
         save(); screen = "Match Centre"
+        if let season, season.round != previousRound,
+           let fixture = season.fixtures.first(where: {
+               $0.round == previousRound && ($0.home == season.selectedClub || $0.away == season.selectedClub)
+           }) {
+            let homeClub = season.clubs.first { $0.id == fixture.home }!
+            let awayClub = season.clubs.first { $0.id == fixture.away }!
+            let kits = TeamKits.select(home: homeClub, away: awayClub)
+            liveMatch = MatchPlayback(fixture: fixture, home: name(fixture.home), away: name(fixture.away),
+                                      parameters: season.matchParameters ?? .default, tactic: season.tactic, homeKit: kits.0, awayKit: kits.1, managedClubID: season.selectedClub,
+                                      squad: season.clubs.first { $0.id == season.selectedClub }?.players ?? [])
+        }
     }
     @discardableResult
     func listPlayerForTransfer(_ id: Int) -> Bool { completeTransfer { try $0.listPlayerForTransfer(id) } }

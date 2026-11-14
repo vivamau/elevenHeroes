@@ -69,7 +69,7 @@ struct SeasonPositionsView: View {
                 Text("League positions").font(.title2.weight(.semibold))
                 Spacer()
                 if focusedTeam != nil {
-                    Button("Show all teams") { focusedTeam = nil }.buttonStyle(.bordered)
+                    Button("Show all teams") { focusedTeam = nil }.gamePrimaryAction()
                 }
             }
             Text("Position after each matchweek · Select a team below to follow its season.")
@@ -92,7 +92,7 @@ struct SeasonPositionsView: View {
                     }
                 }
             }
-        }.padding(22).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(22).gameSurface()
             .onChange(of: season.year) { _, _ in focusedTeam = nil }
     }
 }

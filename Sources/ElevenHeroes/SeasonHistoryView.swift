@@ -8,6 +8,7 @@ struct GoalEvent: Codable {
     let assistID: Int?
     let assistName: String?
     var minute: Int? = nil
+    var goalDescription: String? = nil
 }
 
 struct SeasonLeader: Identifiable {
@@ -50,7 +51,7 @@ struct SeasonHistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Button(action: onBack) { Label("Back to overview", systemImage: "chevron.left") }
+            Button(action: onBack) { Label("Back to overview", systemImage: "chevron.left") }.keyboardShortcut("[", modifiers: .command)
                 .buttonStyle(.plain).foregroundStyle(AppTheme.accent)
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
@@ -162,6 +163,6 @@ struct SeasonHistoryView: View {
                     if index < rows.count - 1 { Divider() }
                 }
             }
-        }.padding(22).frame(maxWidth: .infinity).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(22).frame(maxWidth: .infinity).gameSurface()
     }
 }

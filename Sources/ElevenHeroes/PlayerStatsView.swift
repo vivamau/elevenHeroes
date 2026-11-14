@@ -32,7 +32,7 @@ struct PlayerStatsView: View {
             HStack {
                 SectionCaption("Stats · Value")
                 Spacer()
-                Button("History…") { showingHistory = true }.buttonStyle(.plain).font(.caption).foregroundStyle(AppTheme.accent).disabled(records.isEmpty)
+                Button("History…") { showingHistory = true }.gamePrimaryAction().controlSize(.small).disabled(records.isEmpty)
             }
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -93,7 +93,7 @@ struct PlayerStatsView: View {
                     HStack {
                         Text("Value history").font(.title2.weight(.semibold))
                         Spacer()
-                        Button("Done") { showingHistory = false }.keyboardShortcut(.cancelAction)
+                        Button("Done") { showingHistory = false }.gamePrimaryAction().keyboardShortcut(.cancelAction)
                     }
                     Text(player.name).foregroundStyle(.secondary)
                     Text("Valuations in recording order. Multiple records can share a date.").font(.caption).foregroundStyle(.secondary)

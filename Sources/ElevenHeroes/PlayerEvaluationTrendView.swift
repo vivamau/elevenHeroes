@@ -60,7 +60,7 @@ struct PlayerEvaluationTrendView: View {
                     }
                 }.font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-        }.padding(18).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(18).gameSurface()
             .onChange(of: seasonValue?.year) { _, _ in selectedRound = nil }
     }
 

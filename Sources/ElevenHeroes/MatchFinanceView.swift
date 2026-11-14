@@ -15,17 +15,25 @@ struct MatchFinance {
 
 struct LatestMatchReportView: View {
     let season: Season
+    @State private var showingCalculations = false
     private var fixture: Fixture? {
         season.fixtures.first { $0.round == season.round - 1 && $0.homeGoals != nil && ($0.home == season.selectedClub || $0.away == season.selectedClub) }
     }
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 24) {
-                events.frame(minWidth: 340, maxWidth: .infinity, alignment: .leading)
-                finances.frame(width: 280)
+        VStack(alignment: .leading, spacing: 20) {
+            events.frame(maxWidth: .infinity, alignment: .leading)
+            finances
+            if fixture != nil {
+                Button("Score calculations") { showingCalculations = true }.gamePrimaryAction()
             }
-            VStack(alignment: .leading, spacing: 20) { events; finances }
-        }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+            .sheet(isPresented: $showingCalculations) {
+                if let fixture {
+                    ScoreCalculationView(fixture: fixture,
+                        homeName: season.clubs.first { $0.id == fixture.home }?.name ?? "Home",
+                        awayName: season.clubs.first { $0.id == fixture.away }?.name ?? "Away")
+                }
+            }
     }
     private var events: some View {
         VStack(alignment: .leading, spacing: 12) {

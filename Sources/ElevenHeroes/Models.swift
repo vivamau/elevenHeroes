@@ -21,6 +21,8 @@ struct Club: Identifiable, Codable, Hashable {
     let name: String
     let city: String
     var players: [Footballer]
+    var teamColorPrimary: String? = nil
+    var teamColorSecondary: String? = nil
     var stadiumName: String? = nil
     var stadiumCapacity: Int? = nil
     var weeklyWages: Int { players.reduce(0) { $0 + max(0, $1.currentSalary) } }
@@ -40,6 +42,8 @@ struct Fixture: Identifiable, Codable {
     var stadiumName: String? = nil
     var stadiumCapacity: Int? = nil
     var goalEvents: [GoalEvent]? = nil
+    var scoreCalculations: [ScoreCalculation]? = nil
+    var substitutions: [MatchSubstitution]? = nil
     var homeLineup: [Int]? = nil
     var awayLineup: [Int]? = nil
     var homeSubstitutes: [Int]? = nil
@@ -141,7 +145,9 @@ struct Season: Codable {
             let involved = home.id == selectedClub || away.id == selectedClub
             let context = MatchSimulationContext(home: home, away: away, selectedClub: selectedClub, lineup: lineup, tactic: tactic, round: round, fixtures: fixtures, year: year)
             let simulator = MatchSimulator(parameters: matchParameters ?? .default)
-            let (hg, ag) = simulator.simulate(context: context, rng: &rng)
+            let calculation = simulator.simulateRecorded(context: context, rng: &rng)
+            let (hg, ag) = (calculation.homeGoals, calculation.awayGoals)
+            fixtures[index].scoreCalculations = [calculation]
             fixtures[index].homeGoals = hg; fixtures[index].awayGoals = ag
             let capacity = max(0, home.stadiumCapacity ?? 20_000)
             fixtures[index].stadiumCapacity = capacity
@@ -156,11 +162,13 @@ struct Season: Codable {
                 let squad = club.id == selectedClub ? club.players.filter { lineup.contains($0.id) } : Array(club.players.sorted { $0.rating > $1.rating }.prefix(11))
                 for _ in 0..<count {
                     let minute = Int.random(in: 1...90, using: &rng)
-                    let scorer = squad.randomElement(using: &rng)
+                    let scorer = simulator.scorer(from: squad, rng: &rng)
                     let assistant = Bool.random(using: &rng) ? squad.filter { $0.id != scorer?.id }.randomElement(using: &rng) : nil
+                    let description = GoalCommentary.describe(scorer: scorer?.name ?? club.name,
+                                                              assist: assistant?.name, variation: minute + recorded.count)
                     recorded.append(GoalEvent(clubID: club.id, clubName: club.name, scorerID: scorer?.id, scorerName: scorer?.name,
-                                              assistID: assistant?.id, assistName: assistant?.name, minute: minute))
-                    events.append((minute, "\(minute)′  GOAL · \(scorer?.name ?? club.name) — \(club.name)"))
+                                              assistID: assistant?.id, assistName: assistant?.name, minute: minute, goalDescription: description))
+                    events.append((minute, "\(minute)′  GOAL · \(scorer?.name ?? club.name) — \(club.name)\n\(description)"))
                     if let assistant { events.append((minute, "    assist · \(assistant.name)")) }
                 }
             }
@@ -256,7 +264,10 @@ enum Database {
             guard row.count >= 2, let pid = Int(row[0]), let end = Int(row[1]) else { return nil }
             return (pid, end)
         }, uniquingKeysWith: { max($0, $1) })
-        let teams = try rows("SELECT t.id,t.team_name,COALESCE(c.city_name,'') FROM team t LEFT JOIN city c ON c.id=t.city_id ORDER BY t.id")
+        let teamColumns = try rows("PRAGMA table_info(team)").map { $0[1] }
+        let primaryColumn = teamColumns.contains("team_color_primary") ? "t.team_color_primary" : "NULL"
+        let secondaryColumn = teamColumns.contains("team_color_secondary") ? "t.team_color_secondary" : "NULL"
+        let teams = try rows("SELECT t.id,t.team_name,COALESCE(c.city_name,''),COALESCE(\(primaryColumn),''),COALESCE(\(secondaryColumn),'') FROM team t LEFT JOIN city c ON c.id=t.city_id ORDER BY t.id")
         return try teams.map { t in
             let id = Int(t[0]) ?? 0
             let players = try rows("SELECT DISTINCT p.id,p.player_name || ' ' || p.player_lastname,COALESCE((s.player_skills_phys_pace+s.player_skills_phys_stamina+s.player_skills_phys_strength)/3.0,10) FROM player p JOIN team_players tp ON tp.player_id=p.id LEFT JOIN player_skills_physical s ON s.player_id=p.id WHERE tp.team_id=? ORDER BY p.id", [String(id)])
@@ -265,7 +276,7 @@ enum Database {
                 Footballer(id: Int(p[0]) ?? i, name: p[1], role: profiles[Int(p[0]) ?? 0]?.values["position_name"].map { position in
                     if position == "GK" { return "GK" }; if position.hasPrefix("D") { return "DEF" }; if position.hasPrefix("M") { return "MID" }; if position.hasPrefix("A") { return "FWD" }; return position
                 } ?? role(i), rating: min(99,max(1,Int((Double(p[2]) ?? 10) * 5))), profile: profiles[Int(p[0]) ?? 0], marketValue: values[Int(p[0]) ?? 0], valueHistory: histories[Int(p[0]) ?? 0], contractEndDate: contractEnds[Int(p[0]) ?? 0])
-            }, stadiumName: stadium?[1], stadiumCapacity: stadium.flatMap { Int($0[2]) }.map { max(0, $0) })
+            }, teamColorPrimary: t[3], teamColorSecondary: t[4], stadiumName: stadium?[1], stadiumCapacity: stadium.flatMap { Int($0[2]) }.map { max(0, $0) })
         }
     }
     static func role(_ index: Int) -> String { index < 2 ? "GK" : index < 8 ? "DEF" : index < 14 ? "MID" : "FWD" }
@@ -273,10 +284,11 @@ enum Database {
         let templates = demo
         var names = templates.flatMap(\.players).map(\.name).shuffled(using: &rng)
         return templates.map { club in
-            Club(id: club.id, name: club.name, city: club.city, players: club.players.map { player in
+            let colors = TeamKits.generated(using: &rng)
+            return Club(id: club.id, name: club.name, city: club.city, players: club.players.map { player in
                 Footballer(id: player.id, name: names.removeLast(), role: player.role,
                            rating: Int.random(in: 50...89, using: &rng), marketValue: Int.random(in: 1...100, using: &rng))
-            })
+            }, teamColorPrimary: colors.0, teamColorSecondary: colors.1)
         }
     }
     static var demo: [Club] {

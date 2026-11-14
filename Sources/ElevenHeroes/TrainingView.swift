@@ -10,41 +10,46 @@ struct TrainingView: View {
     let season: Season
     let store: GameStore
     @State private var tactics: [Tactic] = []
-    @State private var currentTactic: String = ""
+    @State private var parameters = MatchSimulationParameters.default
+    @State private var status = ""
     @State private var error: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Choose and tune the tactics available to your club. Changes feed the match engine parameters.")
+            Text("Set your default approach for upcoming matches. Changes made during a match last for that match only.")
                 .foregroundStyle(.secondary)
             if let error {
                 Label(error, systemImage: "exclamationmark.circle.fill").foregroundStyle(.red)
             }
-            VStack(alignment: .leading, spacing: 12) {
-                Text("CURRENT TACTIC").font(.system(size: 11, weight: .bold)).tracking(1.7).foregroundStyle(.secondary)
-                Picker("Current tactic", selection: $currentTactic) {
-                    ForEach(tactics) { tactic in Text(tactic.name).tag(tactic.name) }
-                }.pickerStyle(.segmented)
-                Button("Apply to season") { applyTactic() }.gamePrimaryAction()
+            GameCard(title: "Season strategy") {
+                StrategyMixEditor(parameters: $parameters)
+                HStack {
+                    Button("Save season strategy") { applyTactic() }.gamePrimaryAction()
+                    if !status.isEmpty { Label(status, systemImage: "checkmark.circle").font(.callout).foregroundStyle(.secondary) }
+                }
             }
-            .padding(20).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("TACTICS").font(.system(size: 11, weight: .bold)).tracking(1.7).foregroundStyle(.secondary)
+                DisclosureGroup("Advanced tactic profiles") {
+                Text("Edit how each approach affects attack and defence. Save these profiles, then apply them to the season.")
+                    .font(.caption).foregroundStyle(.secondary)
                 ForEach(tactics.indices, id: \.self) { index in
                     tacticEditor(index: index)
                 }
-                Button("Save tactics") { saveTactics() }.buttonStyle(.borderedProminent).tint(AppTheme.accent).foregroundStyle(AppTheme.background)
+                Button("Save tactic profiles") { saveTactics() }.gamePrimaryAction()
+                Button("Apply saved profiles to season") { applyProfiles() }.gamePrimaryAction()
+                }
             }
-            .padding(20).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+            .padding(20).gameSurface()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear(perform: load)
+        .onChange(of: parameters.strategyMix) { _, _ in status = "" }
     }
 
     private func tacticEditor(index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Name", text: $tactics[index].name).textFieldStyle(.roundedBorder)
+            Text(tactics[index].name).font(.headline)
             HStack {
                 Text("Attack").frame(width: 60, alignment: .leading)
                 Slider(value: $tactics[index].attack, in: -0.5...0.5, step: 0.01)
@@ -60,13 +65,11 @@ struct TrainingView: View {
     }
 
     private func load() {
+        parameters = store.season?.matchParameters ?? .default
         do {
             let db = try FootballDatabase(url: store.databaseURL)
-            tactics = try db.tactics()
-            currentTactic = season.tactic
-            if !tactics.contains(where: { $0.name == currentTactic }) {
-                currentTactic = tactics.first?.name ?? "Balanced"
-            }
+            tactics = try db.tactics().filter { StrategyMix.names.contains($0.name) }
+            parameters = store.season?.matchParameters ?? .default
         } catch {
             self.error = error.localizedDescription
         }
@@ -78,14 +81,21 @@ struct TrainingView: View {
             for tactic in tactics {
                 _ = try db.saveTactic(id: tactic.id, name: tactic.name, attack: tactic.attack, defense: tactic.defense)
             }
-            load()
+            tactics = try db.tactics().filter { StrategyMix.names.contains($0.name) }
+            status = "Tactic profiles saved"
         } catch {
             self.error = error.localizedDescription
         }
     }
 
     private func applyTactic() {
-        store.season?.tactic = currentTactic
+        let previous = store.season
+        store.season?.matchParameters = parameters
+        if store.save(to: store.saveURL) { status = "Season strategy saved" }
+        else { store.season = previous; status = "" }
+    }
+
+    private func applyProfiles() {
         // Update match parameters tactic profiles from the database.
         do {
             let db = try FootballDatabase(url: store.databaseURL)
@@ -96,8 +106,12 @@ struct TrainingView: View {
                 profiles[tactic.name] = TacticProfile(attack: tactic.attack, defense: tactic.defense)
             }
             params.tactics = profiles
+            let previous = store.season
             store.season?.matchParameters = params
-            store.save()
+            if store.save(to: store.saveURL) {
+                parameters = params
+                status = "Tactic profiles applied"
+            } else { store.season = previous; status = "" }
         } catch {
             self.error = error.localizedDescription
         }

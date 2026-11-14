@@ -29,7 +29,7 @@ struct IncomingOffersView: View {
             if offers.isEmpty {
                 ContentUnavailableView("No pending offers", systemImage: "tray", description: Text("Play the next matchweek to hear from other clubs."))
                     .frame(maxWidth: .infinity, minHeight: 260)
-                    .background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+                    .gameSurface()
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -61,20 +61,20 @@ struct IncomingOffersView: View {
                     Text("The player will move immediately. If they are in your starting XI, a replacement will be selected from your squad.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     HStack {
-                        Button("Cancel", role: .cancel) { reviewing = nil }.keyboardShortcut(.cancelAction)
+                        Button("Cancel", role: .cancel) { reviewing = nil }.gamePrimaryAction().keyboardShortcut(.cancelAction)
                         Spacer()
                         Button("Accept \(offer.credits) credits") {
                             if store.acceptOffer(offer.id) {
                                 onComplete("\(player.name) joined \(clubName(offer.buyerClubID)) for \(offer.credits) credits.")
                             }
                             reviewing = nil
-                        }.buttonStyle(MarketCommitButtonStyle()).disabled(!(store.season?.canSellPlayer(player.id) ?? false))
+                        }.gamePrimaryAction().disabled(!(store.season?.canSellPlayer(player.id) ?? false))
                     }
                 }.padding(28).frame(width: 500).background(AppTheme.background)
             } else {
                 VStack(spacing: 20) {
                     Text("This offer is no longer available.")
-                    Button("Close") { reviewing = nil }
+                    Button("Close", role: .cancel) { reviewing = nil }.gamePrimaryAction()
                 }.padding(28)
             }
         }
@@ -101,11 +101,11 @@ struct IncomingOffersView: View {
                 Spacer()
                 Button("Reject") {
                     if store.rejectOffer(offer.id) { onComplete("Offer from \(clubName(offer.buyerClubID)) for \(player.name) rejected.") }
-                }.buttonStyle(.bordered).accessibilityLabel("Reject offer for \(player.name)")
-                Button("Review offer") { reviewing = offer }.buttonStyle(.bordered)
+                }.gamePrimaryAction().accessibilityLabel("Reject offer for \(player.name)")
+                Button("Review offer") { reviewing = offer }.gamePrimaryAction()
                     .accessibilityLabel("Review offer for \(player.name)")
             }
-        }.padding(18).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(18).gameSurface()
     }
     private func detail(_ title: String, _ value: String) -> some View {
         HStack {

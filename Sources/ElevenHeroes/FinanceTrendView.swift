@@ -84,7 +84,7 @@ struct FinanceTrendView: View {
                     Text("Only recorded finance values are shown.").font(.caption2).foregroundStyle(.secondary)
                 }
             }
-        }.padding(18).background(AppTheme.panel, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(18).gameSurface()
             .onChange(of: season.year) { _, _ in selectedRound = nil }
             .onChange(of: clubID) { _, _ in selectedRound = nil }
     }
