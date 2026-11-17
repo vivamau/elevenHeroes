@@ -3,14 +3,14 @@ import Testing
 @testable import ElevenHeroes
 
 struct TeamKitTests {
-    @Test func generatedColoursAreValidAndStronglyDifferent() {
+    @Test func generatedColoursAreValidAndStronglyDifferent() throws {
         var rng = SeasonTests.Seeded(state: 42)
         for _ in 0..<100 {
             let pair = TeamKits.generated(using: &rng)
             #expect(TeamKits.rgb(pair.0) != nil && TeamKits.rgb(pair.1) != nil)
             #expect(TeamKits.difference(pair.0, pair.1) > 0.8)
         }
-        let clubs = Database.generateFictionalLeague(using: &rng)
+        let clubs = try Database.generateFictionalLeague(using: &rng)
         #expect(clubs.allSatisfy { $0.teamColorPrimary != nil && $0.teamColorSecondary != nil })
     }
 

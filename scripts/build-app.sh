@@ -14,6 +14,7 @@ cp db/team_details.json "$APP/Contents/Resources/team_details.json"
 cp db/countries.json "$APP/Contents/Resources/countries.json"
 cp db/db.sqlite "$APP/Contents/Resources/db.sqlite"
 cp db/player_profiles.json "$APP/Contents/Resources/player_profiles.json"
+cp db/human_male_names.txt db/halfling_surnames.txt "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

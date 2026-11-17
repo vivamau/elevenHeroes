@@ -85,13 +85,14 @@ struct CareerSetupTests {
         #expect(try Data(contentsOf: store.saveURL) == saved)
     }
 
-    @Test func generatedLeagueHasPlayableSquads() {
+    @Test func generatedLeagueHasPlayableSquads() throws {
         var rng = SeasonTests.Seeded()
-        let clubs = Database.generateFictionalLeague(using: &rng)
+        let clubs = try Database.generateFictionalLeague(using: &rng)
         #expect(clubs.count == 8)
         let players = clubs.flatMap(\.players)
         #expect(players.count == 160)
         #expect(Set(players.map(\.id)).count == 160)
+        #expect(Set(players.map(\.name)).count == 160)
         #expect(players.allSatisfy { (50...89).contains($0.rating) })
         for club in clubs {
             #expect(club.players.filter { $0.role == "GK" }.count >= 1)
@@ -99,7 +100,8 @@ struct CareerSetupTests {
             #expect(club.players.filter { $0.role == "MID" }.count >= 4)
             #expect(club.players.filter { $0.role == "FWD" }.count >= 2)
         }
-        #expect(clubs != Database.generateFictionalLeague(using: &rng))
+        let nextClubs = try Database.generateFictionalLeague(using: &rng)
+        #expect(players.map(\.name) != nextClubs.flatMap(\.players).map(\.name))
     }
 
     @Test func olderPlayerSavesRemainReadable() throws {
