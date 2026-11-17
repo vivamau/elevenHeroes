@@ -2,6 +2,14 @@ import Testing
 @testable import ElevenHeroes
 
 struct MatchPlaybackTests {
+    @Test func halfTimeStopsAt45EvenWhenClockOvershoots() {
+        #expect(MatchPlayback.playbackTime(proposed: 28.4, halfTimeTaken: false) == 28.4)
+        #expect(MatchPlayback.playbackTime(proposed: 30, halfTimeTaken: false) == 28.5)
+        #expect(MatchPlayback.playbackTime(proposed: 65, halfTimeTaken: false) == 28.5)
+        #expect(MatchPlayback.playbackTime(proposed: 30, halfTimeTaken: true) == 30)
+        #expect(MatchPlayback.playbackTime(proposed: 65, halfTimeTaken: true) == 60)
+    }
+
     @Test func revealsGoalsAtTheirScheduledTimesAndEndsWithinOneMinute() {
         var fixture = Fixture(id: 1, round: 1, home: 10, away: 20, homeGoals: 2, awayGoals: 1)
         fixture.goalEvents = [
